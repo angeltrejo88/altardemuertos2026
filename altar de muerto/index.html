@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Altar Digital de Día de Muertos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Altar de Muertos</h1>
+  <div id="barra"></div>
+</header>
+
+<main>
+  <!-- EDITAR: pantalla de bienvenida y reglas -->
+  <section id="bienvenida" hidden>
+    <h2>Altar Digital de Día de Muertos</h2>
+    <p class="sub">Un espacio para recordar y honrar a quienes queremos.</p>
+    <h3>Cómo funciona</h3>
+    <ul>
+      <li>Crea tu perfil gratuito solo con tu nombre y un PIN de 6 dígitos.</li>
+      <li>Sube hasta 3 fotografías de tus seres queridos o de personas que recuerdes con cariño. Tienes hasta el <b>30 de octubre</b>.</li>
+      <li>Toca cualquier foto para ver sus ofrendas y mensajes, y deja la tuya: vela, flor de cempasúchil, pan de muerto o calaverita de dulce.</li>
+      <li>Del <b>31 de octubre al 6 de noviembre</b> las velas se encienden y el altar honra de manera especial a todas las personas recordadas. Podrás seguir dejando ofrendas, pero ya no se podrán cambiar las fotos ni sus nombres y mensajes.</li>
+    </ul>
+    <div class="resumen"><b>Lo esencial</b>
+  <ul>
+    <li>Honra con respeto: sube solo fotos que puedas compartir.</li>
+    <li>Escribe mensajes amables.</li>
+    <li>Cuida tu PIN y no compartas el enlace.</li>
+  </ul>
+</div>
+<details><summary>Leer las 6 reglas completas</summary>
+    <ol>
+      <li>Respeta a todas las personas recordadas aquí y a quienes las recuerdan.</li>
+      <li>Sube solo fotos que puedas compartir y que honren con respeto a la persona. No se permiten imágenes ofensivas, violentas ni inapropiadas.</li>
+      <li>Escribe mensajes amables, sin burlas ni groserías.</li>
+      <li>Cuida tu PIN: no lo compartas y, de preferencia, no uses uno que ya uses en otro lado (celular, banco).</li>
+      <li>Este altar es entre personas de confianza: no compartas el enlace ni las fotos de otros fuera de aquí sin su permiso.</li>
+      <li>El administrador puede quitar cualquier contenido que no respete estas reglas.</li>
+    </ol>
+    </details>
+    <div id="r-acepto"><p><b>¿Estás de acuerdo en respetar estas reglas?</b></p>
+    <div class="botones">
+      <button id="si" class="primario">Sí, estoy de acuerdo</button>
+      <button id="no">No, solo quiero ver el altar</button>
+    </div>
+    <p><a href="#" id="ya-tengo">Ya tengo perfil, entrar</a></p>
+    </div>
+<div class="botones" id="r-volver" hidden><button id="r-cerrar" class="primario">Entendido, volver al altar</button></div>
+  </section>
+
+  <!-- EDITAR: mensaje de agradecimiento (después del cierre) -->
+  <section id="gracias" hidden>
+    <h2>Gracias por formar parte de este altar</h2>
+    <p>Entre todos recordamos a quienes siempre llevamos en el corazón. Esperamos volver a encenderlo contigo el próximo año.</p>
+    <p class="sub">El altar descansa hasta entonces. Puedes recorrerlo.</p>
+    <div class="botones"><button id="ver-altar" class="primario">Ver el altar</button></div>
+  </section>
+
+  <section id="auth" hidden>
+    <h2 id="auth-titulo"></h2>
+    <form id="form-auth" autocomplete="off">
+      <label><span id="lbl-nombre">Tu nombre</span><input id="a-nombre" maxlength="60" required></label>
+      <label><span id="lbl-pin">PIN de 6 dígitos</span><input id="a-pin" type="password" inputmode="numeric" maxlength="30" required></label>
+      <p id="a-error" class="error" role="alert"></p>
+      <div class="botones">
+        <button class="primario" id="a-enviar"></button>
+        <button type="button" id="a-cancelar">Volver al altar</button>
+      </div>
+    </form>
+    <p id="a-cambiar"></p>
+  </section>
+
+  <section id="altar" hidden>
+    <div class="botones"><button id="b-agregar" class="primario" hidden></button></div>
+    <div id="reserva"></div>
+    <div id="escena">
+  <div id="fondo"></div><div id="guirnalda"></div>
+  <div class="flores izq"></div><div class="flores der"></div>
+  <div id="niveles"></div>
+</div>
+<div id="luz"></div>
+    <p id="vacio" class="sub" hidden>Todavía no hay fotos en el altar.</p>
+  </section>
+</main>
+
+<footer>
+  <p id="nota"></p>
+  <small id="debug"></small>
+</footer>
+
+<dialog id="ficha"></dialog>
+
+<dialog id="f-foto">
+  <form id="form-foto">
+    <h3 id="f-titulo"></h3>
+    <label id="f-archivo">1. Elige tu foto<input name="archivo" type="file" accept="image/*"></label>
+    <div id="f-previa" hidden>
+      <span id="f-marco" class="marco m1"><span id="visor"><img id="visor-img" alt=""></span></span>
+      <label id="f-zoomlbl">Acercar<input id="f-zoom" type="range" min="1" max="3" step="0.01" value="1"></label>
+      <p class="sub" id="f-ayuda">Arrastra la foto para encuadrarla.</p>
+    </div>
+    <fieldset><legend>Marco</legend>
+      <label><input type="radio" name="marco" value="1" checked> Madera</label>
+      <label><input type="radio" name="marco" value="2"> Dorado</label>
+      <label><input type="radio" name="marco" value="3"> Talavera</label>
+      <label><input type="radio" name="marco" value="4"> Cempasúchil</label>
+    </fieldset>
+    <label>A quién honras<input name="honrado" maxlength="20" required></label>
+    <label>Tu mensaje (opcional)<textarea name="mensaje" maxlength="120" rows="3"></textarea></label>
+    <p id="f-error" class="error" role="alert"></p>
+    <div class="botones">
+      <button class="primario" id="f-guardar">Guardar</button>
+      <button type="button" id="f-cancelar">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="zoom">
+  <div id="zv"><img id="zi" alt=""></div>
+  <p class="sub">Pellizca o toca dos veces para acercar</p>
+  <button id="zc" class="primario">Cerrar</button>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
