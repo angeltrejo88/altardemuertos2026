@@ -7,13 +7,16 @@ const CONFIG = {
   MAX_FOTOS: 3,
   NOMBRE_MAX: 20,
   CORTO_MAX: 15,
-  MOSTRAR_DEBUG: true, // EDITAR: ponlo en false al terminar las pruebas
+  MOSTRAR_DEBUG: false, // EDITAR: ponlo en false al terminar las pruebas
   IMG_VELA: "vela.png", IMG_FLOR: "flor.png", IMG_PAN: "pan.png", IMG_CALAVERA: "calaverita.png", // EDITAR
   IMG_FONDO: "fondo.png", IMG_FLORES: "", IMG_GUIRNALDA: "guirnalda.png",          // EDITAR
   IMG_TELAS: ["", "", "", ""],// EDITAR (opcional): tiras repetibles de tela, magenta/naranja/morado
   IMG_MARCOS: ["marco 1.png", "marco 2.png", "marco 3.png", "marco 4.png"], // EDITAR: PNG de cada marco (madera, dorado, talavera, cempasúchil)
   MARCO_HUECO: 8,               // % de margen entre el borde del marco y la foto (ver medidas abajo)
   ZOOM_MAX: 2.2,
+    PISTAS: ["audio/pista1.mp3", "audio/pista2.mp3", "audio/pista3.mp3"], // EDITAR: tus 3 pistas ("" para desactivar)
+  VOLUMEN: 0.5,
+  ADMIN_FUNCTION: "quick-handler", // Nombre de la Edge Function en Supabase
 };
 
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
@@ -92,6 +95,8 @@ function barra() {
   if (S.user) {
     b.append(txt("", esAdmin() ? "Administrador" : "Hola, " + (S.perfil?.nombre || "")), boton("Reglas", verReglas),
       boton("Salir", async () => { await sb.auth.signOut(); await setUser(null); await cargar(); ver("altar"); }));
+    if (esAdmin()) b.insertBefore(boton("Panel", abrirPanel), b.lastChild);
+
   } else if (S.fase !== "cerrado") {
     b.append(boton("Reglas", verReglas), boton("Entrar", () => abrirAuth("entrar")));
   }
@@ -267,17 +272,13 @@ function repisa(f) {
   r.className = "repisa";
   for (const tipo of Object.keys(TIPOS)) {
     const n = f.ofrendas.filter(o => o.tipo === tipo).length;
-    if (!n) continue;
-    const g = document.createElement("span");
-    g.className = "of";
-    if (tipo === "vela") {                       // hasta 3 velas; el resto como +N
-      for (let i = 0; i < Math.min(n, 3); i++) g.append(icono(tipo));
-      if (n > 3) g.append(txt("mas", "+" + (n - 3)));
-    } else {
-      g.append(icono(tipo));
-      if (n > 1) g.append(txt("mas", "+" + (n - 1)));
+    const s = document.createElement("span");
+    s.className = "of ranura";
+    if (n) {
+      s.append(icono(tipo));
+      if (n > 1) s.append(txt("mas", "+" + (n - 1)));
     }
-    r.append(g);
+    r.append(s);
   }
   return r;
 }
@@ -363,8 +364,11 @@ function zonaParticipar(f, abierto) {
   cuatro.hidden = !abierto;
   const bt = document.createElement("button");
   bt.className = "primario";
-  bt.textContent = "Dejar una ofrenda aquí";
-  bt.onclick = () => { cuatro.hidden = !cuatro.hidden; };
+    bt.textContent = abierto ? "Ocultar ofrendas" : "Dejar una ofrenda aquí";
+  bt.onclick = () => {
+    cuatro.hidden = !cuatro.hidden;
+    bt.textContent = cuatro.hidden ? "Dejar una ofrenda aquí" : "Ocultar ofrendas";
+  };
   for (const [tipo, t] of Object.entries(TIPOS)) {
     const mia = S.mias.find(o => o.tipo === tipo);
     const c = document.createElement("div");
@@ -528,6 +532,7 @@ async function elegirArchivo(file) {
     S.enc.ox = (S.enc.W - base.width * S.enc.s0) / 2;
     S.enc.oy = (S.enc.H - base.height * S.enc.s0) * .3;   // un poco hacia arriba, donde suelen estar las caras
     pintar();
+    sincMarco();
   } catch { $("#f-error").textContent = "No se pudo leer esta imagen. Prueba con una foto en JPG o PNG."; }
 }
 
@@ -562,6 +567,9 @@ $("#form-foto").addEventListener("change", ev => {
   if (ev.target.name === "marco") $aplicarMarco($("#f-marco"), ev.target.value);
   if (ev.target.name === "archivo" && ev.target.files[0]) elegirArchivo(ev.target.files[0]);
 });
+
+const sincMarco = () => aplicarMarco($("#f-marco"), $("#form-foto").marco.value);
+$("#form-foto").addEventListener("input", ev => { if (ev.target.name === "marco") sincMarco(); });
 
 async function recortar() {                 // lo que se ve en el visor, a 900×1200
   const e = S.enc, s = e.s0 * e.z;
@@ -661,6 +669,213 @@ function abrirZoom(src) {
   v.onwheel = e => { e.preventDefault(); z.s = Math.min(MAX, Math.max(1, z.s - e.deltaY * .002)); poner(); };
 }
 $("#zc").onclick = () => $("#zoom").close();
+
+   async function vigilarFase() {
+     const { data } = await sb.rpc("estado_altar");
+     if (data && data.fase !== S.fase) location.reload();
+   }
+   setInterval(vigilarFase, 300000);
+   document.addEventListener("visibilitychange", () => { if (!document.hidden) vigilarFase(); });
+
+// ===== Música y botón de regreso =====
+const audio = $("#audio"), pistas = CONFIG.PISTAS.filter(Boolean);
+let pista = 0, iniciada = false;
+const contMusica = $("#cont-musica");
+if (contMusica) contMusica.hidden = !pistas.length;
+if (pistas.length <= 1) {
+  if ($("#b-ant-pista")) $("#b-ant-pista").hidden = true;
+  if ($("#b-sig-pista")) $("#b-sig-pista").hidden = true;
+  if ($("#pista-num")) $("#pista-num").hidden = true;
+}
+
+function normalizarPista(n) {
+  if (!pistas.length) return 0;
+  return ((n % pistas.length) + pistas.length) % pistas.length;
+}
+
+function cargarPista() {
+  if (!pistas.length) return;
+  pista = normalizarPista(pista);
+  audio.src = pistas[pista];
+  const num = $("#pista-num");
+  if (num) num.textContent = `${pista + 1}/${pistas.length}`;
+}
+
+function pintarMusica() {
+  const b = $("#b-musica");
+  const icono = $("#icono-musica");
+  const barras = $("#barras-musica");
+  const num = $("#pista-num");
+  if (num && pistas.length) num.textContent = `${normalizarPista(pista) + 1}/${pistas.length}`;
+  if (!b) return;
+
+  const sonando = iniciada && !audio.paused && !audio.muted;
+
+  if (!iniciada) {
+    if (icono) { icono.hidden = false; icono.textContent = "🎵"; }
+    if (barras) barras.hidden = true;
+    b.setAttribute("aria-label", "Activar música");
+  } else if (audio.muted) {
+    if (icono) { icono.hidden = false; icono.textContent = "🔇"; }
+    if (barras) barras.hidden = true;
+    b.setAttribute("aria-label", "Activar sonido");
+  } else if (audio.paused) {
+    if (icono) { icono.hidden = false; icono.textContent = "🔇"; }
+    if (barras) barras.hidden = true;
+    b.setAttribute("aria-label", "Reanudar música");
+  } else {
+    // Reproduciendo con sonido: barras en movimiento
+    if (icono) icono.hidden = true;
+    if (barras) barras.hidden = false;
+    b.setAttribute("aria-label", "Silenciar música");
+  }
+}
+
+async function iniciarMusica() {
+  if (iniciada || !pistas.length) return;
+  try {
+    cargarPista();
+    audio.volume = CONFIG.VOLUMEN;
+    await audio.play();
+    iniciada = true;
+    $("#b-musica")?.classList.remove("pulso");
+    pintarMusica();
+    ["pointerup", "keydown"].forEach(t => document.removeEventListener(t, alToque, true));
+  } catch {}
+}
+
+async function saltarPista(delta) {
+  if (!pistas.length) return;
+  pista = normalizarPista(pista + delta);
+  cargarPista();
+  if (!iniciada) {
+    await iniciarMusica();
+  } else {
+    try {
+      await audio.play();
+    } catch {}
+    pintarMusica();
+  }
+}
+
+function alToque(ev) {
+  if (!ev.target.closest?.("#cont-musica, #b-musica")) iniciarMusica();
+}
+["pointerup", "keydown"].forEach(t => document.addEventListener(t, alToque, true));
+
+audio.onended = () => {
+  pista = normalizarPista(pista + 1);
+  cargarPista();
+  audio.play().catch(() => {});
+  pintarMusica();
+};
+audio.onplay = pintarMusica;
+audio.onpause = pintarMusica;
+audio.onerror = () => {
+  if (!iniciada || !pistas.length) return;
+  setTimeout(() => {
+    pista = normalizarPista(pista + 1);
+    cargarPista();
+    audio.play().catch(() => {});
+    pintarMusica();
+  }, 1000);
+};
+
+$("#b-musica").onclick = () => {
+  if (!iniciada) return iniciarMusica();
+  audio.muted = !audio.muted;
+  pintarMusica();
+};
+
+const btnAnt = $("#b-ant-pista");
+if (btnAnt) btnAnt.onclick = () => saltarPista(-1);
+
+const btnSig = $("#b-sig-pista");
+if (btnSig) btnSig.onclick = () => saltarPista(1);
+
+document.addEventListener("visibilitychange", () => {
+  if (!iniciada) return;
+  if (document.hidden) audio.pause(); else audio.play().catch(() => {});
+});
+
+pintarMusica();
+
+const arriba = $("#b-arriba");
+addEventListener("scroll", () => { arriba.hidden = scrollY < 600; }, { passive: true });
+arriba.onclick = () => scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+
+// ===== Panel de administrador =====
+async function llamarAdmin(accion, datos = {}) {
+  const nombreFuncion = CONFIG.ADMIN_FUNCTION || "quick-handler";
+  const { data, error } = await sb.functions.invoke(nombreFuncion, { body: { accion, ...datos } });
+  if (error) {
+    let m = error.message;
+    try { m = (await error.context.json()).error || m; } catch {}
+    throw new Error(m);
+  }
+  return data;
+}
+
+async function abrirPanel() {
+  if (!esAdmin()) return;
+  ver("panel");
+  const est = $("#p-estado");
+  est.textContent = "Conectando con el servidor…";
+  try { await llamarAdmin("ping"); est.textContent = "Servidor conectado ✓"; }
+  catch (e) { est.textContent = "Servidor no disponible: " + e.message; }
+  const { data, error } = await sb.from("perfiles").select("id,nombre,es_admin").order("creado_en");
+  const lista = $("#p-lista");
+  lista.replaceChildren();
+  if (error) {
+    lista.append(txt("error", "Error al cargar usuarios: " + error.message));
+    return;
+  }
+  for (const p of data || []) {
+    const fotos = S.fotos.filter(f => f.user_id === p.id).length;
+    const ofr = S.fotos.flatMap(f => f.ofrendas || []).filter(o => o.user_id === p.id).length;
+    const fila = document.createElement("div");
+    fila.className = "fila-u";
+    const t = document.createElement("div");
+    t.append(txt("quien2", p.nombre + (p.es_admin ? " (administrador)" : "")), txt("sub", fotos + " fotos · " + ofr + " ofrendas"));
+    fila.append(t);
+    if (!p.es_admin) {
+      const a = document.createElement("button");
+      a.textContent = "Restablecer PIN";
+      a.onclick = () => resetPin(p);
+      const b = document.createElement("button");
+      b.textContent = "Borrar cuenta";
+      b.onclick = () => borrarCuenta(p, fotos, ofr);
+      fila.append(a, b);
+    }
+    lista.append(fila);
+  }
+}
+
+async function resetPin(p) {
+  const pin = prompt("Nuevo PIN de 6 dígitos para " + p.nombre + ":");
+  if (pin === null) return;
+  if (!/^\d{6}$/.test(pin.trim())) return alert("El PIN debe tener exactamente 6 dígitos.");
+  try {
+    await llamarAdmin("reset_pin", { user_id: p.id, pin: pin.trim() });
+    alert("Listo. El nuevo PIN de " + p.nombre + " es " + pin.trim());
+  } catch (e) { alert("No se pudo: " + e.message); }
+}
+
+async function borrarCuenta(p, fotos, ofr) {
+  const t = prompt("Se borrarán " + fotos + " fotos y " + ofr + " ofrendas de " + p.nombre + ". No se puede deshacer.\nEscribe su nombre para confirmar:");
+  if (t === null) return;
+  if (t.trim().toLowerCase() !== p.nombre.trim().toLowerCase()) return alert("El nombre no coincide. No se borró nada.");
+  try { await llamarAdmin("delete_user", { user_id: p.id }); await cargar(); await abrirPanel(); }
+  catch (e) { alert("No se pudo: " + e.message); }
+}
+
+$("#p-vaciar").onclick = async () => {
+  if (!confirm("Se borrarán TODAS las fotos y ofrendas de todos. Las cuentas se conservan. ¿Continuar?")) return;
+  if (prompt("Escribe BORRAR TODO para confirmar:") !== "BORRAR TODO") return alert("No se borró nada.");
+  try { await llamarAdmin("wipe_all"); await cargar(); await abrirPanel(); alert("El altar quedó en blanco."); }
+  catch (e) { alert("No se pudo: " + e.message); }
+};
+$("#p-volver").onclick = () => ver("altar");
 
 init();
 

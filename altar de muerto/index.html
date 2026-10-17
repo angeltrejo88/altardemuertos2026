@@ -80,17 +80,42 @@
     <div id="reserva"></div>
     <div id="escena">
   <div id="fondo"></div><div id="guirnalda"></div>
-  <div class="flores izq"></div><div class="flores der"></div>
+  <p id="tema"><b>Voces que no se apagan</b><br><small>Altar a los artistas y figuras que seguimos recordando con cariño</small></p>
   <div id="niveles"></div>
 </div>
 <div id="luz"></div>
     <p id="vacio" class="sub" hidden>Todavía no hay fotos en el altar.</p>
   </section>
+
+<section id="panel" hidden>
+  <h2>Panel de administrador</h2>
+  <p class="sub" id="p-estado"></p>
+  <div id="p-lista"></div>
+  <details class="peligro"><summary>Zona de riesgo</summary>
+    <p>Deja el altar en blanco: se borran todas las fotos y ofrendas. Las cuentas se conservan.</p>
+    <button type="button" id="p-vaciar">Dejar todo en blanco</button>
+  </details>
+  <div class="botones"><button id="p-volver">Volver al altar</button></div>
+</section>
 </main>
 
 <footer>
   <p id="nota"></p>
   <small id="debug"></small>
+
+  <div class="footer-divisor" aria-hidden="true"><span>✿</span></div>
+
+  <div class="footer-creditos">
+    <p class="hecho-con">Hecho con cariño para todos los difuntos por <br><b>Angel Trejo</b><br> 🇲🇽</p>
+    <!-- Coloca tu imagen 'logo-estudio.png' en esta carpeta y reemplaza el enlace de Facebook -->
+    <a href="https://www.facebook.com/TU_PAGINA" target="_blank" rel="noopener noreferrer" class="estudio-enlace" title="Visitar AT Design Studio en Facebook">
+      <div class="logo-circulo">
+        <img id="logo-estudio" src="Firma 3.png" alt="Logo AT Design Studio" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="logo-placeholder">AT</div>
+      </div>
+      <span class="estudio-texto">AT Design Studio</span>
+    </a>
+  </div>
 </footer>
 
 <dialog id="ficha"></dialog>
@@ -124,6 +149,25 @@
   <p class="sub">Pellizca o toca dos veces para acercar</p>
   <button id="zc" class="primario">Cerrar</button>
 </dialog>
+
+<audio id="audio" preload="none"></audio>
+<div id="flotantes">
+  <button id="b-arriba" aria-label="Volver al inicio" hidden>⬆️</button>
+  <div id="cont-musica" class="cont-musica" role="group" aria-label="Control de música">
+    <button id="b-ant-pista" type="button" aria-label="Pista anterior" title="Pista anterior">⏮️</button>
+    <button id="b-musica" type="button" class="pulso" aria-label="Activar música" title="Silenciar / Activar sonido">
+      <span id="icono-musica">🎵</span>
+      <span id="barras-musica" class="ecualizador" hidden aria-hidden="true">
+        <span class="barra b1"></span>
+        <span class="barra b2"></span>
+        <span class="barra b3"></span>
+        <span class="barra b4"></span>
+      </span>
+    </button>
+    <button id="b-sig-pista" type="button" aria-label="Siguiente pista" title="Siguiente pista">⏭️</button>
+    <span id="pista-num" class="pista-num" title="Pista actual">1/3</span>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script src="script.js"></script>
