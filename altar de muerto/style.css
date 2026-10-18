@@ -83,7 +83,7 @@ dialog::backdrop{background:#000a}
 .fase-velas .llama{display:block}
 @keyframes llama{0%,100%{transform:translate(-50%,-92%) scale(1,1) rotate(-1deg)}25%{transform:translate(-50%,-92%) scale(.93,1.07) rotate(2deg)}50%{transform:translate(-50%,-92%) scale(1.05,.95) rotate(-2deg)}75%{transform:translate(-50%,-92%) scale(.97,1.04) rotate(1deg)}}
 /* luz de vela en todo el altar y resplandor por foto */
-#luz{position:fixed;inset:0;pointer-events:none;display:none;z-index:2}.fase-velas #luz{display:block}
+#luz{position:fixed;inset:0;pointer-events:none;display:none;z-index:4}.fase-velas #luz{display:block}
 #luz::before,#luz::after{content:"";position:absolute;inset:0}
 #luz::before{background:radial-gradient(ellipse at 50% 55%,#ffb04744,transparent 70%);animation:resp 6s ease-in-out infinite}
 #luz::after{background:radial-gradient(ellipse at 40% 70%,#ff8a2a33,transparent 60%);animation:vaiven 3.7s ease-in-out infinite}
@@ -92,7 +92,7 @@ dialog::backdrop{background:#000a}
 .fase-velas .tarjeta .marco{box-shadow:0 0 calc(min(var(--n,0),8)*9px) calc(min(var(--n,0),8)*1.5px) #ffa83c66,0 4px 10px #0008}
 
 /* Pétalos de cempasúchil y ambiente alegre de Día de Muertos (31 oct - 6 nov) */
-#canvas-petalos{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;display:none}
+#canvas-petalos{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;display:none}
 .fase-velas #canvas-petalos{display:block}
 .fase-velas #escena::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 35%,rgba(255,150,30,.16),transparent 75%);z-index:0;animation:respira-altar 5s ease-in-out infinite}
 .fase-velas #tema{box-shadow:0 0 0 3px #150a2b,0 0 0 5px var(--nar),0 0 26px rgba(248,198,48,.45),0 10px 24px #000b,inset 0 0 20px #f8c63044}
