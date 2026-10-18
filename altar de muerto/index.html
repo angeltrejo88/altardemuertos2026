@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Altar Digital de Día de Muertos</title>
+<meta name="theme-color" content="#0d0a14">
+<title>Altar Digital de Día de Muertos 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -17,46 +18,46 @@
 <main>
   <!-- EDITAR: pantalla de bienvenida y reglas -->
   <section id="bienvenida" hidden>
-    <h2>Altar Digital de Día de Muertos</h2>
-    <p class="sub">Un espacio para recordar y honrar a quienes queremos.</p>
+    <h2>Voces que no se apagan</h2>
+    <p class="sub">Altar digital de Día de Muertos para recordar con cariño a los artistas y figuras que ya no están.</p>
     <h3>Cómo funciona</h3>
     <ul>
       <li>Crea tu perfil gratuito solo con tu nombre y un PIN de 6 dígitos.</li>
-      <li>Sube hasta 3 fotografías de tus seres queridos o de personas que recuerdes con cariño. Tienes hasta el <b>30 de octubre</b>.</li>
+      <li>Sube hasta 3 fotografías de artistas, cantantes, actores o personas de la vida pública que ya no están y que sigues recordando con cariño. Tienes hasta el <b>30 de octubre</b>.</li>
       <li>Toca cualquier foto para ver sus ofrendas y mensajes, y deja la tuya: vela, flor de cempasúchil, pan de muerto o calaverita de dulce.</li>
-      <li>Del <b>31 de octubre al 6 de noviembre</b> las velas se encienden y el altar honra de manera especial a todas las personas recordadas. Podrás seguir dejando ofrendas, pero ya no se podrán cambiar las fotos ni sus nombres y mensajes.</li>
+      <li>Del <b>31 de octubre al 6 de noviembre</b> las velas se encienden y el altar luce en todo su esplendor. Podrás seguir dejando ofrendas, pero ya no se podrán cambiar las fotos ni sus nombres y mensajes.</li>
     </ul>
     <div class="resumen"><b>Lo esencial</b>
-  <ul>
-    <li>Honra con respeto: sube solo fotos que puedas compartir.</li>
-    <li>Escribe mensajes amables.</li>
-    <li>Cuida tu PIN y no compartas el enlace.</li>
-  </ul>
-</div>
-<details><summary>Leer las 6 reglas completas</summary>
-    <ol>
-      <li>Respeta a todas las personas recordadas aquí y a quienes las recuerdan.</li>
-      <li>Sube solo fotos que puedas compartir y que honren con respeto a la persona. No se permiten imágenes ofensivas, violentas ni inapropiadas.</li>
-      <li>Escribe mensajes amables, sin burlas ni groserías.</li>
-      <li>Cuida tu PIN: no lo compartas y, de preferencia, no uses uno que ya uses en otro lado (celular, banco).</li>
-      <li>Este altar es entre personas de confianza: no compartas el enlace ni las fotos de otros fuera de aquí sin su permiso.</li>
-      <li>El administrador puede quitar cualquier contenido que no respete estas reglas.</li>
-    </ol>
+      <ul>
+        <li>Elige a personas que se recuerden con cariño, sin polémicas.</li>
+        <li>Escribe mensajes amables.</li>
+        <li>Cuida tu PIN y no compartas el enlace.</li>
+      </ul>
+    </div>
+    <details><summary>Leer las 6 reglas completas</summary>
+      <ol>
+        <li>Respeta a todas las personas recordadas aquí y a quienes las recuerdan.</li>
+        <li>Sube solo fotos de personas que ya fallecieron y que se recuerden con cariño en la vida pública. Evita figuras polémicas. No se permiten imágenes ofensivas, violentas ni inapropiadas.</li>
+        <li>Escribe mensajes amables, sin burlas ni groserías.</li>
+        <li>Cuida tu PIN: no lo compartas y, de preferencia, no uses uno que ya uses en otro lado (celular, banco).</li>
+        <li>Este altar es entre personas de confianza: no compartas el enlace ni las fotos de otros fuera de aquí sin su permiso.</li>
+        <li>El administrador puede quitar cualquier contenido que no respete estas reglas.</li>
+      </ol>
     </details>
     <div id="r-acepto"><p><b>¿Estás de acuerdo en respetar estas reglas?</b></p>
-    <div class="botones">
-      <button id="si" class="primario">Sí, estoy de acuerdo</button>
-      <button id="no">No, solo quiero ver el altar</button>
+      <div class="botones">
+        <button id="si" class="primario">Sí, estoy de acuerdo</button>
+        <button id="no">No, solo quiero ver el altar</button>
+      </div>
+      <p><a href="#" id="ya-tengo">Ya tengo perfil, entrar</a></p>
     </div>
-    <p><a href="#" id="ya-tengo">Ya tengo perfil, entrar</a></p>
-    </div>
-<div class="botones" id="r-volver" hidden><button id="r-cerrar" class="primario">Entendido, volver al altar</button></div>
+    <div class="botones" id="r-volver" hidden><button id="r-cerrar" class="primario">Entendido, volver al altar</button></div>
   </section>
 
   <!-- EDITAR: mensaje de agradecimiento (después del cierre) -->
   <section id="gracias" hidden>
     <h2>Gracias por formar parte de este altar</h2>
-    <p>Entre todos recordamos a quienes siempre llevamos en el corazón. Esperamos volver a encenderlo contigo el próximo año.</p>
+    <p>Entre todos recordamos a las voces que nos acompañaron y que siguen vivas en nuestra memoria. Esperamos volver a encender este altar contigo el próximo año.</p>
     <p class="sub">El altar descansa hasta entonces. Puedes recorrerlo.</p>
     <div class="botones"><button id="ver-altar" class="primario">Ver el altar</button></div>
   </section>
@@ -64,9 +65,9 @@
   <section id="auth" hidden>
     <h2 id="auth-titulo"></h2>
     <form id="form-auth" autocomplete="off">
-      <label><span id="lbl-nombre">Tu nombre</span><input id="a-nombre" maxlength="60" required></label>
-      <label><span id="lbl-pin">PIN de 6 dígitos</span><input id="a-pin" type="password" inputmode="numeric" maxlength="30" required></label>
-      <p id="a-error" class="error" role="alert"></p>
+      <label><span id="lbl-nombre">Tu nombre</span><input id="a-nombre" maxlength="20" required autocomplete="username"><small id="a-nombre-cont" class="cont"></small></label>
+      <label><span id="lbl-pin">PIN de 6 dígitos</span><input id="a-pin" type="password" inputmode="numeric" maxlength="6" required autocomplete="current-password"><small id="a-pin-cont" class="cont"></small></label>
+     <p id="a-error" class="error" role="alert" hidden></p>
       <div class="botones">
         <button class="primario" id="a-enviar"></button>
         <button type="button" id="a-cancelar">Volver al altar</button>
@@ -76,10 +77,11 @@
   </section>
 
   <section id="altar" hidden>
+    <div id="aviso" class="aviso" role="status" hidden></div>
     <div class="botones"><button id="b-agregar" class="primario" hidden></button></div>
     <div id="reserva"></div>
     <div id="escena">
-  <div id="fondo"></div><div id="guirnalda"></div>
+  <div id="guirnalda"></div>
   <p id="tema"><b>Voces que no se apagan</b><br><small>Altar a los artistas y figuras que seguimos recordando con cariño</small></p>
   <div id="niveles"></div>
 </div>
@@ -90,6 +92,7 @@
 <section id="panel" hidden>
   <h2>Panel de administrador</h2>
   <p class="sub" id="p-estado"></p>
+  <p class="sub" id="p-resumen"></p>
   <div id="p-lista"></div>
   <details class="peligro"><summary>Zona de riesgo</summary>
     <p>Deja el altar en blanco: se borran todas las fotos y ofrendas. Las cuentas se conservan.</p>
@@ -100,21 +103,13 @@
 </main>
 
 <footer>
-  <p id="nota"></p>
-  <small id="debug"></small>
-
-  <div class="footer-divisor" aria-hidden="true"><span>✿</span></div>
-
-  <div class="footer-creditos">
-    <p class="hecho-con">Hecho con cariño para todos los difuntos por <br><b>Angel Trejo</b><br> 🇲🇽</p>
-    <!-- Coloca tu imagen 'logo-estudio.png' en esta carpeta y reemplaza el enlace de Facebook -->
-    <a href="https://www.facebook.com/TU_PAGINA" target="_blank" rel="noopener noreferrer" class="estudio-enlace" title="Visitar AT Design Studio en Facebook">
-      <div class="logo-circulo">
-        <img id="logo-estudio" src="Firma 3.png" alt="Logo AT Design Studio" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-        <div class="logo-placeholder">AT</div>
-      </div>
-      <span class="estudio-texto">AT Design Studio</span>
-    </a>
+  <div class="pie-caja">
+    <div class="footer-divisor" aria-hidden="true"><span>✿</span></div>
+    <img class="firma" src="Firma 3.png" alt="By Angel Trejo · AT Design Studio">
+    <p>© AT Design Studio</p>
+    <p><a href="https://facebook.com/AngelTrejo88" target="_blank" rel="noopener noreferrer">By: Angel Trejo</a></p>
+    <p>Todos los derechos reservados</p>
+    <p>Durango, Dgo. · México 🇲🇽</p>
   </div>
 </footer>
 
@@ -135,7 +130,7 @@
       <label><input type="radio" name="marco" value="3"> Talavera</label>
       <label><input type="radio" name="marco" value="4"> Cempasúchil</label>
     </fieldset>
-    <label>A quién honras<input name="honrado" maxlength="20" required></label>
+    <label>A quién recuerdas<input name="honrado" maxlength="20" required></label>
     <label>Tu mensaje (opcional)<textarea name="mensaje" maxlength="120" rows="3"></textarea></label>
     <p id="f-error" class="error" role="alert"></p>
     <div class="botones">
@@ -153,7 +148,7 @@
 <audio id="audio" preload="none"></audio>
 <div id="flotantes">
   <button id="b-arriba" aria-label="Volver al inicio" hidden>⬆️</button>
-  <div id="cont-musica" class="cont-musica" role="group" aria-label="Control de música">
+  <div id="cont-musica" class="cont-musica min" role="group" aria-label="Control de música">
     <button id="b-ant-pista" type="button" aria-label="Pista anterior" title="Pista anterior">⏮️</button>
     <button id="b-musica" type="button" class="pulso" aria-label="Activar música" title="Silenciar / Activar sonido">
       <span id="icono-musica">🎵</span>
@@ -168,6 +163,8 @@
     <span id="pista-num" class="pista-num" title="Pista actual">1/3</span>
   </div>
 </div>
+<div id="fondo"></div>
+<canvas id="canvas-petalos" aria-hidden="true"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script src="script.js"></script>

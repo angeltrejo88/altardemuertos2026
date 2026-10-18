@@ -9,7 +9,7 @@ const CONFIG = {
   CORTO_MAX: 15,
   MOSTRAR_DEBUG: false, // EDITAR: ponlo en false al terminar las pruebas
   IMG_VELA: "vela.png", IMG_FLOR: "flor.png", IMG_PAN: "pan.png", IMG_CALAVERA: "calaverita.png", // EDITAR
-  IMG_FONDO: "fondo.png", IMG_FLORES: "", IMG_GUIRNALDA: "guirnalda.png",          // EDITAR
+  IMG_FONDO: "fondo.webp", IMG_FLORES: "", IMG_GUIRNALDA: "guirnalda.png",          // EDITAR
   IMG_TELAS: ["", "", "", ""],// EDITAR (opcional): tiras repetibles de tela, magenta/naranja/morado
   IMG_MARCOS: ["marco 1.png", "marco 2.png", "marco 3.png", "marco 4.png"], // EDITAR: PNG de cada marco (madera, dorado, talavera, cempasúchil)
   MARCO_HUECO: 8,               // % de margen entre el borde del marco y la foto (ver medidas abajo)
@@ -38,6 +38,47 @@ const TIPOS = {
 };
 const puedeOfrendar = () => S.user && (esAdmin() || S.fase !== "cerrado");
 
+function msjError(err) {
+  if (!err) return "Ocurrió un error inesperado.";
+  const m = (typeof err === "string" ? err : err.message || err.error_description || "").toLowerCase();
+  if (m.includes("invalid login credentials") || m.includes("invalid_grant")) {
+    return "Contraseña o PIN incorrecto. Por favor verifica tus datos.";
+  }
+  if (m.includes("user already registered") || m.includes("already exists")) {
+    return "Ya existe una cuenta con este nombre. Selecciona 'Entrar'.";
+  }
+  if (m.includes("password should be at least")) {
+    return "El PIN debe tener al menos 6 dígitos.";
+  }
+  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network")) {
+    return "Error de conexión. Revisa tu internet e inténtalo de nuevo.";
+  }
+  if (m.includes("rate limit") || m.includes("too many requests") || m.includes("over_email_send_rate_limit")) {
+    return "Demasiados intentos seguidos. Por favor espera unos minutos antes de intentar de nuevo.";
+  }
+  if (m.includes("storage") || m.includes("payload too large")) {
+    return "La imagen es demasiado pesada. Elige otra foto más ligera.";
+  }
+  return typeof err === "string" ? err : err.message || "No se pudo completar la operación.";
+}
+
+function determinarFase(data) {
+  if (new URLSearchParams(location.search).has("velas")) return "velas";
+  if (data?.fase) {
+    if (data.fase === "velas") return "velas";
+    if (data.fase === "cerrado") return "cerrado";
+  }
+  try {
+    const ahora = data?.ahora ? new Date(data.ahora) : new Date();
+    const strMx = ahora.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); // YYYY-MM-DD
+    const [y, m, d] = strMx.split("-").map(Number);
+    // 31 de Octubre a 6 de Noviembre: fase de velas
+    if ((m === 10 && d >= 31) || (m === 11 && d <= 6)) return "velas";
+    if ((m === 11 && d > 6) || m > 11) return "cerrado";
+  } catch {}
+  return data?.fase || "edicion";
+}
+
 const uuid = () => {
   if (crypto.randomUUID) return crypto.randomUUID();
   const b = crypto.getRandomValues(new Uint8Array(16));
@@ -45,34 +86,41 @@ const uuid = () => {
 };
 
 function ver(id) {
+  document.body.dataset.vista = id;
   document.querySelectorAll("main > section").forEach(s => s.hidden = s.id !== id);
+  if (typeof actualizarEstadoPetalos === "function") actualizarEstadoPetalos();
 }
-function msjError(e) {
-  const m = e?.message || String(e);
-  if (/already|registered/i.test(m)) return "Ese nombre ya está ocupado. Elige otro.";
-  if (/invalid login/i.test(m)) return "Nombre o PIN incorrecto.";
-  if (/row-level security|policy/i.test(m)) return "Ya no se puede hacer este cambio.";
-  if (/duplicate key/i.test(m)) return "Esa ofrenda ya la usaste. Muévela desde la foto donde está.";
-  if (/email/i.test(m) && /invalid/i.test(m)) return "Supabase rechazó el correo interno (revisa EMAIL_DOMAIN en CONFIG): " + m;
-  return m;
-}
+
+// === DECLARACIÓN GLOBAL DE err AQUÍ ===
+const err = t => {
+  const el = $("#a-error");
+  if (!el) return;
+  el.textContent = t;
+  if (t) {
+    el.hidden = false; // Muestra el cuadro y el triángulo de precaución solo si hay texto
+    el.classList.remove("shake");
+    void el.offsetWidth;
+    el.classList.add("shake");
+  } else {
+    el.hidden = true;  // Lo oculta completamente si está vacío
+  }
+};
 
 // ===== Inicio =====
 async function init() {
-    document.documentElement.style.setProperty("--hueco", CONFIG.MARCO_HUECO + "%");
-  const { data } = await sb.rpc("estado_altar");
-  if (data) S.fase = data.fase;
+  document.documentElement.style.setProperty("--hueco", CONFIG.MARCO_HUECO + "%");
+  let estadoData = null;
+  try {
+    const { data } = await sb.rpc("estado_altar");
+    estadoData = data;
+  } catch {}
+  S.fase = determinarFase(estadoData);
   decorar();
+  iniciarPetalosCempasuchil();
   const { data: { session } } = await sb.auth.getSession();
   await setUser(session?.user);
   await cargar();
-  const textos = {
-    edicion: "Puedes subir tus fotos hasta el 30 de octubre.",
-    velas: "Este altar permanece encendido hasta el 6 de noviembre.",
-    cerrado: ""
-  };
-  $("#nota").textContent = textos[S.fase];
-  if (CONFIG.MOSTRAR_DEBUG) $("#debug").textContent = "Fase actual: " + S.fase;
+  pintarAviso(estadoData);
   if (new URLSearchParams(location.search).has("admin") && !S.user) return abrirAuth("admin");
   if (S.user || ls.get("acuerdo")) return ver("altar");
   ver(S.fase === "cerrado" ? "gracias" : "bienvenida");
@@ -93,13 +141,38 @@ function barra() {
   b.replaceChildren();
   const boton = (t, f) => { const x = document.createElement("button"); x.textContent = t; x.onclick = f; return x; };
   if (S.user) {
-    b.append(txt("", esAdmin() ? "Administrador" : "Hola, " + (S.perfil?.nombre || "")), boton("Reglas", verReglas),
+    b.append(txt("", esAdmin() ? "Admin" : "Hola, " + (S.perfil?.nombre || "")), boton("Reglas", verReglas),
       boton("Salir", async () => { await sb.auth.signOut(); await setUser(null); await cargar(); ver("altar"); }));
     if (esAdmin()) b.insertBefore(boton("Panel", abrirPanel), b.lastChild);
 
   } else if (S.fase !== "cerrado") {
     b.append(boton("Reglas", verReglas), boton("Entrar", () => abrirAuth("entrar")));
   }
+}
+
+function pintarAviso(e) {
+  const a = $("#aviso");
+  if (!e) return;
+  const mx = d => new Date(d).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  const dias = f => Math.round((Date.parse(mx(f)) - Date.parse(mx(e.ahora))) / 864e5);
+  const fecha = f => new Date(f).toLocaleDateString("es-MX", { day: "numeric", month: "long", timeZone: "America/Mexico_City" });
+  let t = "", s = "";
+  if (e.fase === "edicion") {
+    const n = dias(e.cierre_fotos);
+    t = (n <= 0 ? "Hoy es el último día" : n === 1 ? "Mañana es el último día" : "Quedan " + n + " días") + " para subir tus fotos";
+    s = "Hasta el " + fecha(e.cierre_fotos) + " a las 11:59 p. m. · El " + fecha(Date.parse(e.cierre_fotos) + 864e5) + " se encienden las velas";
+  } else if (e.fase === "velas") {
+    const n = dias(e.fin_velas);
+    t = "🕯️ Las velas están encendidas";
+    s = "Hasta el " + fecha(e.fin_velas) + " · " + (n <= 0 ? "hoy es el último día" : n === 1 ? "mañana es el último día" : "quedan " + n + " días") + " para dejar ofrendas";
+  } else {
+    t = "Gracias por participar";
+    s = "El altar descansa hasta el próximo año";
+  }
+  const b = document.createElement("b"), sm = document.createElement("small");
+  b.textContent = t; sm.textContent = s;
+  a.replaceChildren(b, sm);
+  a.hidden = false;
 }
 
 // ===== Bienvenida y acceso =====
@@ -122,11 +195,55 @@ function abrirAuth(modo) {
   S.modo = modo;
   const admin = modo === "admin", reg = modo === "registro";
   $("#auth-titulo").textContent = admin ? "Acceso de administrador" : reg ? "Crea tu perfil" : "Entrar";
-  $("#lbl-nombre").textContent = admin ? "Correo" : "Tu nombre";
+  $("#lbl-nombre").textContent = admin ? "Correo electrónico" : "Tu nombre";
   $("#lbl-pin").textContent = admin ? "Clave" : "PIN de 6 dígitos";
   $("#a-enviar").textContent = reg ? "Crear perfil" : "Entrar";
-  $("#a-error").textContent = "";
+  err(""); // Esto limpia el texto y aplica hidden = true automáticamente
   $("#form-auth").reset();
+
+  const nombreInp = $("#a-nombre");
+  const pinInp = $("#a-pin");
+  nombreInp.maxLength = admin ? 60 : CONFIG.NOMBRE_MAX;
+  nombreInp.placeholder = admin ? "admin@ejemplo.com" : "Ej. Juan Carlos";
+  pinInp.maxLength = admin ? 40 : 6;
+  pinInp.placeholder = admin ? "Tu clave" : "6 dígitos numéricos";
+
+  // Contador de caracteres para nombre
+  const contNom = $("#a-nombre-cont");
+  if (contNom) {
+    const actCont = () => {
+      if (admin) {
+        contNom.textContent = "";
+      } else {
+        const act = nombreInp.value.length;
+        const max = CONFIG.NOMBRE_MAX;
+        const quedan = max - act;
+        contNom.textContent = quedan <= 5 ? `Te quedan ${quedan} de ${max} caracteres` : `${act}/${max} caracteres`;
+        contNom.classList.toggle("poco", quedan <= 5);
+      }
+    };
+    nombreInp.oninput = actCont;
+    actCont();
+  }
+
+  
+
+  // Contador o ayuda para PIN
+  const contPin = $("#a-pin-cont");
+  if (contPin) {
+    const actPin = () => {
+      if (admin) {
+        contPin.textContent = "";
+      } else {
+        const n = pinInp.value.length;
+        contPin.textContent = n === 6 ? "✓ 6 dígitos" : `${n}/6 dígitos`;
+        contPin.classList.toggle("poco", n > 0 && n < 6);
+      }
+    };
+    pinInp.oninput = actPin;
+    actPin();
+  }
+
   const c = $("#a-cambiar");
   c.replaceChildren();
   if (!admin) {
@@ -140,30 +257,133 @@ function abrirAuth(modo) {
   ver("auth");
 }
 
+
+
 $("#form-auth").onsubmit = async e => {
   e.preventDefault();
-  const nombre = $("#a-nombre").value.trim(), pin = $("#a-pin").value;
-  const err = t => $("#a-error").textContent = t;
-  let r, email = nombre;
-  if (S.modo !== "admin") {
-    if (!/^\d{6}$/.test(pin)) return err("El PIN debe tener exactamente 6 dígitos.");
-    const k = clave(nombre);
-    if (!k || nombre.length > CONFIG.NOMBRE_MAX) return err("Escribe un nombre de hasta " + CONFIG.NOMBRE_MAX + " caracteres.");
-    email = k + "@" + CONFIG.EMAIL_DOMAIN;
-  }
-  $("#a-enviar").disabled = true;
-  try {
-    if (S.modo === "registro") {
-      r = await sb.auth.signUp({ email, password: pin, options: { data: { nombre } } });
-      if (!r.error && !r.data.session) r = await sb.auth.signInWithPassword({ email, password: pin });
-    } else {
-      r = await sb.auth.signInWithPassword({ email, password: pin });
+  const nombreInput = $("#a-nombre");
+  const pinInput = $("#a-pin");
+  const nombre = nombreInput.value.trim();
+  const pin = pinInput.value.trim();
+  
+  err("");
+
+  if (S.modo === "admin") {
+    if (!nombre || !nombre.includes("@")) {
+      return err("Por favor escribe un correo de administrador válido.");
     }
-    if (r.error) return err(msjError(r.error));
-    await setUser(r.data.user);
-    await cargar();
-    ver("altar");
-  } finally { $("#a-enviar").disabled = false; }
+    if (!pin) {
+      return err("Por favor escribe la clave de administrador.");
+    }
+    $("#a-enviar").disabled = true;
+    try {
+      const r = await sb.auth.signInWithPassword({ email: nombre, password: pin });
+      if (r.error || !r.data?.user) {
+        return err("Correo o clave de administrador incorrectos.");
+      }
+      await setUser(r.data.user);
+      await cargar();
+      ver("altar");
+    } catch (x) {
+      err(msjError(x));
+    } finally {
+      $("#a-enviar").disabled = false;
+    }
+    return;
+  }
+
+  // --- MODO USUARIO NORMAL ---
+  // 1. Validaciones del nombre
+  if (!nombre) {
+    return err("Por favor escribe tu nombre.");
+  }
+  if (nombre.length > CONFIG.NOMBRE_MAX) {
+    return err(`El nombre de usuario es demasiado largo (máximo ${CONFIG.NOMBRE_MAX} caracteres; has escrito ${nombre.length}).`);
+  }
+  if (nombre.length < 2) {
+    return err("El nombre de usuario debe tener al menos 2 caracteres.");
+  }
+  const k = clave(nombre);
+  if (!k) {
+    return err("El nombre debe contener al menos letras o números válidos.");
+  }
+
+  // 2. Validaciones del PIN
+  if (!pin) {
+    return err("Por favor escribe tu PIN de 6 dígitos.");
+  }
+  if (!/^\d+$/.test(pin)) {
+    return err("El PIN solo debe contener números del 0 al 9 (sin letras ni símbolos).");
+  }
+  if (pin.length !== 6) {
+    return err(`El PIN debe tener exactamente 6 dígitos (has ingresado ${pin.length}).`);
+  }
+
+  const email = k + "@" + CONFIG.EMAIL_DOMAIN;
+  $("#a-enviar").disabled = true;
+
+  try {
+    // Buscar perfiles en la base de datos
+    const { data: perfiles, error: errPerfiles } = await sb
+      .from("perfiles")
+      .select("id, nombre");
+
+    const perfilEncontrado = perfiles?.find(p =>
+      clave(p.nombre) === k || p.nombre.trim().toLowerCase() === nombre.toLowerCase()
+    );
+
+    if (S.modo === "entrar") {
+      // 1. Error si la cuenta o perfil no está en la base de datos
+      if (!perfilEncontrado) {
+        return err("Este perfil o cuenta no existe en el altar. Verifica cómo escribiste tu nombre o selecciona 'Crear perfil nuevo'.");
+      }
+
+      // 2. El perfil sí existe en la base de datos: intentamos autenticar
+      const r = await sb.auth.signInWithPassword({ email, password: pin });
+      if (r.error) {
+        const msg = (r.error.message || "").toLowerCase();
+        // Si las credenciales fallaron habiendo verificado que existe el usuario, fue la contraseña/PIN
+        if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
+          return err("Contraseña o PIN incorrecto. Por favor verifica tus 6 dígitos.");
+        }
+        return err(msjError(r.error));
+      }
+      if (!r.data?.user) {
+        return err("No se pudo iniciar sesión. Verifica tu nombre y tu PIN.");
+      }
+      await setUser(r.data.user);
+      await cargar();
+      ver("altar");
+
+    } else if (S.modo === "registro") {
+      // Si el perfil ya existe al intentar registrarse
+      if (perfilEncontrado) {
+        return err(`Ya existe una cuenta con el nombre '${perfilEncontrado.nombre}'. Si es tu cuenta, selecciona 'Entrar'.`);
+      }
+
+      let r = await sb.auth.signUp({ email, password: pin, options: { data: { nombre } } });
+      if (r.error) {
+        const msg = (r.error.message || "").toLowerCase();
+        if (msg.includes("already registered") || msg.includes("already exists")) {
+          return err("Ya existe una cuenta registrada con este nombre. Selecciona 'Ya tengo perfil, entrar'.");
+        }
+        return err(msjError(r.error));
+      }
+      if (!r.data.session) {
+        r = await sb.auth.signInWithPassword({ email, password: pin });
+      }
+      if (r.error || !r.data?.user) {
+        return err("Se creó el perfil, pero ocurrió un detalle al iniciar sesión. Prueba seleccionando 'Entrar' con tu PIN.");
+      }
+      await setUser(r.data.user);
+      await cargar();
+      ver("altar");
+    }
+  } catch (x) {
+    err(msjError(x));
+  } finally {
+    $("#a-enviar").disabled = false;
+  }
 };
 
 // ===== Altar =====
@@ -187,18 +407,161 @@ function guirnaldaSVG() {
   return svgURL(240, 50, `<path d='M0 5h240' stroke='#aaa' stroke-width='1.5'/>` + b);
 }
 
+// ===== Pétalos de Cempasúchil (Ambiente de Día de Muertos) =====
+const petalosAnim = {
+  canvas: null,
+  ctx: null,
+  lista: [],
+  activo: false,
+  rafId: null,
+  ultTiempo: 0
+};
+
+const COLORES_CEMPASUCHIL = [
+  { brillo: "#ffe082", cuerpo: "#ff8f00", borde: "#e65100" }, // Marigold tradicional
+  { brillo: "#ffecb3", cuerpo: "#ffa000", borde: "#ef6c00" }, // Dorado cálido
+  { brillo: "#ffd54f", cuerpo: "#ff6f00", borde: "#d84315" }, // Naranja vivo
+  { brillo: "#fff8e1", cuerpo: "#ffb300", borde: "#f57c00" }, // Flor de muerto amarilla
+  { brillo: "#ffcc80", cuerpo: "#f4511e", borde: "#bf360c" }  // Tono ámbar rojizo
+];
+
+function crearPetalo(ancho, alto, inicial = false) {
+  const col = COLORES_CEMPASUCHIL[Math.floor(Math.random() * COLORES_CEMPASUCHIL.length)];
+  const tam = Math.floor(Math.random() * 8) + 11; // 11 a 19px
+  return {
+    x: Math.random() * ancho,
+    y: inicial ? Math.random() * alto : -tam - Math.random() * 30,
+    tam,
+    vy: Math.random() * 0.7 + 0.65, // Caída serena y respetuosa
+    sway: Math.random() * Math.PI * 2,
+    swayVel: Math.random() * 0.02 + 0.015,
+    swayAmp: Math.random() * 1.2 + 0.6,
+    rot: Math.random() * Math.PI * 2,
+    rotVel: (Math.random() - 0.5) * 0.03,
+    flip: Math.random() * Math.PI * 2,
+    flipVel: Math.random() * 0.035 + 0.02,
+    opacidad: Math.random() * 0.25 + 0.75,
+    colorBrillo: col.brillo,
+    color: col.cuerpo,
+    colorBorde: col.borde
+  };
+}
+
+function iniciarPetalosCempasuchil() {
+  const canvas = $("#canvas-petalos");
+  if (!canvas) return;
+  petalosAnim.canvas = canvas;
+  petalosAnim.ctx = canvas.getContext("2d");
+
+  const redimensionar = () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  };
+  redimensionar();
+  window.addEventListener("resize", redimensionar, { passive: true });
+  actualizarEstadoPetalos();
+}
+
+function actualizarEstadoPetalos() {
+  const debeEstarActivo =
+    document.body.classList.contains("fase-velas") &&
+    document.body.dataset.vista === "altar" &&
+    !document.hidden &&
+    !matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (debeEstarActivo && !petalosAnim.activo) {
+    petalosAnim.activo = true;
+    const canvas = petalosAnim.canvas;
+    if (!canvas) return;
+    const ancho = canvas.width || window.innerWidth;
+    const alto = canvas.height || window.innerHeight;
+    const totalPetalos = window.innerWidth < 640 ? 18 : 30;
+    if (petalosAnim.lista.length === 0) {
+      for (let i = 0; i < totalPetalos; i++) {
+        petalosAnim.lista.push(crearPetalo(ancho, alto, true));
+      }
+    }
+    petalosAnim.ultTiempo = performance.now();
+    petalosAnim.rafId = requestAnimationFrame(animarPetalos);
+  } else if (!debeEstarActivo && petalosAnim.activo) {
+    petalosAnim.activo = false;
+    if (petalosAnim.rafId) {
+      cancelAnimationFrame(petalosAnim.rafId);
+      petalosAnim.rafId = null;
+    }
+    if (petalosAnim.ctx && petalosAnim.canvas) {
+      petalosAnim.ctx.clearRect(0, 0, petalosAnim.canvas.width, petalosAnim.canvas.height);
+    }
+  }
+}
+
+function animarPetalos(tiempo) {
+  if (!petalosAnim.activo) return;
+  const ctx = petalosAnim.ctx;
+  const canvas = petalosAnim.canvas;
+  if (!ctx || !canvas) return;
+
+  const ancho = canvas.width;
+  const alto = canvas.height;
+  ctx.clearRect(0, 0, ancho, alto);
+
+  const delta = Math.min((tiempo - (petalosAnim.ultTiempo || tiempo)) / 16.67, 2.0);
+  petalosAnim.ultTiempo = tiempo;
+
+  for (let i = 0; i < petalosAnim.lista.length; i++) {
+    const p = petalosAnim.lista[i];
+    p.sway += p.swayVel * delta;
+    p.x += Math.sin(p.sway) * p.swayAmp * delta;
+    p.y += p.vy * delta;
+    p.rot += p.rotVel * delta;
+    p.flip += p.flipVel * delta;
+
+    if (p.y > alto + p.tam + 10 || p.x < -40 || p.x > ancho + 40) {
+      petalosAnim.lista[i] = crearPetalo(ancho, alto, false);
+      continue;
+    }
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    const escalaX = Math.cos(p.flip);
+    ctx.scale(escalaX, 1);
+    ctx.globalAlpha = p.opacidad;
+
+    const w = p.tam * 0.48;
+    const h = p.tam;
+
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.5);
+    ctx.bezierCurveTo(w * 0.85, h * 0.15, w * 0.95, -h * 0.25, 0, -h * 0.5);
+    ctx.bezierCurveTo(-w * 0.95, -h * 0.25, -w * 0.85, h * 0.15, 0, h * 0.5);
+    ctx.closePath();
+
+    const grad = ctx.createRadialGradient(0, -h * 0.1, 1, 0, 0, h * 0.65);
+    grad.addColorStop(0, p.colorBrillo);
+    grad.addColorStop(0.6, p.color);
+    grad.addColorStop(1, p.colorBorde);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  petalosAnim.rafId = requestAnimationFrame(animarPetalos);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (typeof actualizarEstadoPetalos === "function") actualizarEstadoPetalos();
+});
+
 function decorar() {
   const url = u => `url("${u}")`;
   $("#guirnalda").style.backgroundImage = CONFIG.IMG_GUIRNALDA ? url(CONFIG.IMG_GUIRNALDA) : guirnaldaSVG();
   if (CONFIG.IMG_FONDO) $("#fondo").style.backgroundImage = url(CONFIG.IMG_FONDO);
   if (CONFIG.IMG_FLORES) document.querySelectorAll(".flores").forEach(e => e.style.backgroundImage = url(CONFIG.IMG_FLORES));
-  document.body.classList.toggle("fase-velas", S.fase === "velas");
-  if (!matchMedia("(prefers-reduced-motion:reduce)").matches) {
-    let t = 0;
-    addEventListener("scroll", () => {
-      if (!t) t = requestAnimationFrame(() => { document.documentElement.style.setProperty("--sy", scrollY); t = 0; });
-    }, { passive: true });
-  }
+  const esVelas = S.fase === "velas" || new URLSearchParams(location.search).has("velas");
+  document.body.classList.toggle("fase-velas", esVelas);
+  if (typeof actualizarEstadoPetalos === "function") actualizarEstadoPetalos();
 }
 
 function vela() {
@@ -435,6 +798,7 @@ function formOfrenda(f, tipo, o) {
   const ta = document.createElement("textarea");
   ta.maxLength = 120; ta.rows = 3; ta.value = o?.mensaje || "";
   l.append(ta);
+  contador(ta);
   const err = txt("error", "");
   const bs = document.createElement("div");
   bs.className = "botones";
@@ -478,10 +842,22 @@ async function refrescar(f) {
 }
 
 // ===== Agregar, editar y borrar fotos =====
+let urlBlobVisor = null;
+function limpiarBlobVisor() {
+  if (urlBlobVisor) {
+    try { URL.revokeObjectURL(urlBlobVisor); } catch {}
+    urlBlobVisor = null;
+  }
+}
+
 $("#b-agregar").onclick = () => abrirForm(null);
-$("#f-cancelar").onclick = () => $("#f-foto").close();
+$("#f-cancelar").onclick = () => {
+  limpiarBlobVisor();
+  $("#f-foto").close();
+};
 
 function abrirForm(f) {
+  limpiarBlobVisor();
   S.editando = f; S.enc = null;
   const form = $("#form-foto"), img = $("#visor-img");
   form.reset();
@@ -499,8 +875,9 @@ function abrirForm(f) {
     form.marco.value = String(f.marco);
     img.src = publicUrl(f.ruta_imagen);
     img.style.cssText = "width:100%;height:100%;left:0;top:0;object-fit:cover";
+    S.conts?.forEach(a => a());
   }
- aplicarMarco($("#f-marco"), f ? f.marco : 1);
+  aplicarMarco($("#f-marco"), f ? f.marco : 1);
   $("#f-foto").showModal();
 }
 
@@ -518,10 +895,12 @@ async function elegirArchivo(file) {
   $("#f-error").textContent = "";
   try {
     const base = await cargarBase(file);
-    const blob = await new Promise(r => base.toBlob(r, "image/jpeg", .9));
+    const blob = await new Promise(r => base.toBlob(r, "image/jpeg", .88));
     const img = $("#visor-img");
     img.removeAttribute("style");
-    img.src = URL.createObjectURL(blob);
+    limpiarBlobVisor();
+    urlBlobVisor = URL.createObjectURL(blob);
+    img.src = urlBlobVisor;
     await img.decode();
     S.enc = { base };
     $("#f-previa").hidden = false;
@@ -564,7 +943,7 @@ $("#f-zoom").oninput = ev => {
 })();
 
 $("#form-foto").addEventListener("change", ev => {
-  if (ev.target.name === "marco") $aplicarMarco($("#f-marco"), ev.target.value);
+  if (ev.target.name === "marco") aplicarMarco($("#f-marco"), ev.target.value);
   if (ev.target.name === "archivo" && ev.target.files[0]) elegirArchivo(ev.target.files[0]);
 });
 
@@ -600,6 +979,7 @@ $("#form-foto").onsubmit = async e => {
       const { error } = await sb.from("fotos").insert({ ...campos, ruta_imagen: ruta });
       if (error) { await sb.storage.from(CONFIG.BUCKET).remove([ruta]); throw error; }
     }
+    limpiarBlobVisor();
     $("#f-foto").close();
     await cargar();
   } catch (x) { err(msjError(x)); }
@@ -781,17 +1161,24 @@ audio.onerror = () => {
   }, 1000);
 };
 
+let tMin;
+function despertarMusica() {
+  contMusica.classList.remove("min");
+  clearTimeout(tMin);
+  tMin = setTimeout(() => contMusica.classList.add("min"), 4000);
+}
 $("#b-musica").onclick = () => {
+  const estabaMin = contMusica.classList.contains("min");
+  despertarMusica();
   if (!iniciada) return iniciarMusica();
-  audio.muted = !audio.muted;
-  pintarMusica();
+  if (!estabaMin) { audio.muted = !audio.muted; pintarMusica(); }
 };
 
 const btnAnt = $("#b-ant-pista");
-if (btnAnt) btnAnt.onclick = () => saltarPista(-1);
+if (btnAnt) btnAnt.onclick = () => { despertarMusica(); saltarPista(-1); };
 
 const btnSig = $("#b-sig-pista");
-if (btnSig) btnSig.onclick = () => saltarPista(1);
+if (btnSig) btnSig.onclick = () => { despertarMusica(); saltarPista(1); };
 
 document.addEventListener("visibilitychange", () => {
   if (!iniciada) return;
@@ -801,7 +1188,16 @@ document.addEventListener("visibilitychange", () => {
 pintarMusica();
 
 const arriba = $("#b-arriba");
-addEventListener("scroll", () => { arriba.hidden = scrollY < 600; }, { passive: true });
+let scrollTicking = false;
+addEventListener("scroll", () => {
+  if (!scrollTicking) {
+    requestAnimationFrame(() => {
+      if (arriba) arriba.hidden = scrollY < 600;
+      scrollTicking = false;
+    });
+    scrollTicking = true;
+  }
+}, { passive: true });
 arriba.onclick = () => scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
 
 // ===== Panel de administrador =====
@@ -826,26 +1222,31 @@ async function abrirPanel() {
   const { data, error } = await sb.from("perfiles").select("id,nombre,es_admin").order("creado_en");
   const lista = $("#p-lista");
   lista.replaceChildren();
-  if (error) {
-    lista.append(txt("error", "Error al cargar usuarios: " + error.message));
-    return;
-  }
+  if (error) { lista.append(txt("error", "Error al cargar usuarios: " + error.message)); return; }
+  const pl = (n, s, p) => n + " " + (n === 1 ? s : p);
+  const personas = (data || []).filter(p => !p.es_admin).length;
+  const totalOfr = S.fotos.reduce((n, f) => n + (f.ofrendas || []).length, 0);
+  $("#p-resumen").textContent = pl(personas, "persona", "personas") + " · " + pl(S.fotos.length, "foto", "fotos") + " · " + pl(totalOfr, "ofrenda", "ofrendas");
   for (const p of data || []) {
     const fotos = S.fotos.filter(f => f.user_id === p.id).length;
     const ofr = S.fotos.flatMap(f => f.ofrendas || []).filter(o => o.user_id === p.id).length;
     const fila = document.createElement("div");
     fila.className = "fila-u";
     const t = document.createElement("div");
-    t.append(txt("quien2", p.nombre + (p.es_admin ? " (administrador)" : "")), txt("sub", fotos + " fotos · " + ofr + " ofrendas"));
+    t.append(txt("quien2", p.nombre + (p.es_admin ? " (administrador)" : "")),
+      txt("sub", pl(fotos, "foto", "fotos") + " · " + pl(ofr, "ofrenda", "ofrendas")));
     fila.append(t);
     if (!p.es_admin) {
+      const acc = document.createElement("div");
+      acc.className = "acciones";
       const a = document.createElement("button");
       a.textContent = "Restablecer PIN";
       a.onclick = () => resetPin(p);
       const b = document.createElement("button");
       b.textContent = "Borrar cuenta";
       b.onclick = () => borrarCuenta(p, fotos, ofr);
-      fila.append(a, b);
+      acc.append(a, b);
+      fila.append(acc);
     }
     lista.append(fila);
   }
@@ -876,6 +1277,23 @@ $("#p-vaciar").onclick = async () => {
   catch (e) { alert("No se pudo: " + e.message); }
 };
 $("#p-volver").onclick = () => ver("altar");
+
+
+function contador(campo) {
+  const c = document.createElement("small");
+  c.className = "cont";
+  campo.insertAdjacentElement("afterend", c);
+  const act = () => {
+    const n = campo.maxLength - campo.value.length;
+    c.textContent = "Te quedan " + n + " de " + campo.maxLength + " caracteres";
+    c.classList.toggle("poco", n <= 10);
+  };
+  campo.addEventListener("input", act);
+  act();
+  return act;
+}
+S.conts = [contador($("#form-foto").honrado), contador($("#form-foto").mensaje)];
+
 
 init();
 
